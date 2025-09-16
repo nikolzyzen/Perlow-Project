@@ -1,9 +1,35 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, MessageSquare, Filter, Download, Search, Calendar, User, Heart, Target, Star } from 'lucide-react';
 
+interface Response {
+  id: number;
+  userName: string;
+  userPhone: string;
+  date: string;
+  time: string;
+  joy: number;
+  achievement: number;
+  meaningfulness: number;
+  influence: string;
+  campaign: string;
+}
+
 const ResponsesView: React.FC = () => {
-  const responses = [
+  const [responses, setResponses] = useState<Response[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchResponses = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/responses');
+        if (response.ok) {
+          const data = await response.json();
+          setResponses(data);
+        } else {
+          // Fallback to sample data if API fails
+          setResponses([
     {
       id: 1,
       userName: 'Sarah Johnson',
@@ -51,14 +77,49 @@ const ResponsesView: React.FC = () => {
       meaningfulness: 7,
       influence: 'Busy day at work but accomplished several tasks',
       campaign: 'Remote Work Impact Study'
-    }
-  ];
+          ]);
+        }
+      } catch (error) {
+        console.error('Error fetching responses:', error);
+        // Keep fallback data on error
+        setResponses([
+          {
+            id: 1,
+            userName: 'Sarah Johnson',
+            userPhone: '+1 (555) 123-4567',
+            date: '2024-01-15',
+            time: '14:32',
+            joy: 9,
+            achievement: 8,
+            meaningfulness: 9,
+            influence: 'Had a great team meeting and completed a major project milestone',
+            campaign: 'Workplace Wellbeing Study'
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchResponses();
+  }, []);
 
   const getScoreColor = (score: number) => {
     if (score >= 8) return 'text-green-600 bg-green-100';
     if (score >= 6) return 'text-yellow-600 bg-yellow-100';
     return 'text-red-600 bg-red-100';
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading responses...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-green-50">

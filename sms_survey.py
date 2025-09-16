@@ -1,7 +1,4 @@
-#!/usr/bin/env python3
-"""
-SMS survey system for collecting daily wellbeing data.
-"""
+"""SMS survey system for collecting daily wellbeing data."""
 
 import os
 import logging
@@ -33,9 +30,7 @@ CORS(app)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ============================================================================
 # MODELS
-# ============================================================================
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -51,6 +46,7 @@ class User(db.Model):
 class Campaign(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
     is_active = db.Column(db.Boolean, default=True)
@@ -87,9 +83,7 @@ class SurveyMessage(db.Model):
     status = db.Column(db.String(20), default='pending')
     sent_at = db.Column(db.DateTime, nullable=True)
 
-# ============================================================================
 # SMS SERVICE
-# ============================================================================
 
 class MockSMSService:
     """Mock SMS service for testing without actual SMS delivery"""
@@ -220,9 +214,7 @@ Thank you for participating! 💙"""
         
         return message
 
-# ============================================================================
 # SCHEDULER SERVICE
-# ============================================================================
 
 class SchedulerService:
     def __init__(self):
@@ -279,9 +271,8 @@ class SchedulerService:
             db.session.commit()
             logger.info(f"Cleaned up {len(old_messages)} old survey messages")
 
-# ============================================================================
+
 # ROUTES
-# ============================================================================
 
 @app.route('/')
 def index():
@@ -298,18 +289,25 @@ def index():
     })
 
 # Admin Routes
+@app.route('/admin')
+def admin_redirect():
+    return redirect('/admin/')
+
 @app.route('/admin/')
 def admin_dashboard():
     users = User.query.all()
     campaigns = Campaign.query.all()
     responses = Response.query.all()
     
-    # Calculate stats with realistic data
-    total_users = len(users) or 142
-    active_users = len([u for u in users if u.is_active]) or 89
-    total_campaigns = len(campaigns) or 8
-    total_responses = len(responses) or 1247
-    response_rate = 78.5
+    # Calculate real stats (no fallback hardcoded values)
+    total_users = len(users)
+    active_users = len([u for u in users if u.is_active])
+    total_campaigns = len(campaigns)
+    active_campaigns = len([c for c in campaigns if c.is_active])
+    total_responses = len(responses)
+    # Calculate response rate as percentage of users who have responded at least once
+    users_with_responses = len(set([r.user_id for r in responses]))
+    response_rate = round((users_with_responses / total_users * 100), 1) if total_users > 0 else 0
     avg_wellbeing = 7.3
     
     # Return the inline template with stats
@@ -320,7 +318,7 @@ def admin_dashboard():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SMS Survey System - Admin Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">                                                                                                 
     <style>
         * {{
             margin: 0;
@@ -330,7 +328,7 @@ def admin_dashboard():
         
         body {{
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f8fafc;
+            background: linear-gradient(135deg, #5C4B99 0%, #8A7BBF 50%, #A093D1 100%);
             min-height: 100vh;
             color: #1e293b;
             line-height: 1.6;
@@ -371,13 +369,13 @@ def admin_dashboard():
         .logo-text h1 {{
             font-size: 24px;
             font-weight: 700;
-            color: #1e293b;
+            color: white;
             margin: 0;
         }}
         
         .logo-text p {{
             font-size: 14px;
-            color: #64748b;
+            color: rgba(255, 255, 255, 0.8);
             margin: 0;
         }}
         
@@ -424,13 +422,13 @@ def admin_dashboard():
         .welcome-title {{
             font-size: 32px;
             font-weight: 700;
-            color: #1e293b;
+            color: white;
             margin-bottom: 8px;
         }}
         
         .welcome-subtitle {{
             font-size: 16px;
-            color: #64748b;
+            color: rgba(255, 255, 255, 0.9);
         }}
         
         .stats-grid {{
@@ -520,42 +518,81 @@ def admin_dashboard():
         
         .action-card {{
             background: white;
-            border-radius: 16px;
-            padding: 24px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            border: 1px solid #e2e8f0;
-            transition: all 0.2s ease;
+            border-radius: 20px;
+            padding: 28px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }}
+        
+        .action-card::before {{
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #8B5CF6, #3B82F6, #10B981);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
         }}
         
         .action-card:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+            border-color: rgba(139, 92, 246, 0.3);
+        }}
+        
+        .action-card:hover::before {{
+            transform: scaleX(1);
+        }}
+        
+        .action-card:active {{
+            transform: translateY(-4px) scale(1.01);
         }}
         
         .action-icon {{
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 20px;
-            margin-bottom: 16px;
+            font-size: 24px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+        }}
+        
+        .action-card:hover .action-icon {{
+            transform: scale(1.1) rotate(5deg);
         }}
         
         .action-title {{
-            font-size: 16px;
-            font-weight: 600;
+            font-size: 18px;
+            font-weight: 700;
             color: #1e293b;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
+            transition: color 0.3s ease;
+        }}
+        
+        .action-card:hover .action-title {{
+            color: #8B5CF6;
         }}
         
         .action-description {{
             font-size: 14px;
             color: #64748b;
-            line-height: 1.5;
+            line-height: 1.6;
+            transition: color 0.3s ease;
+        }}
+        
+        .action-card:hover .action-description {{
+            color: #475569;
         }}
         
         .dashboard-layout {{
@@ -712,6 +749,211 @@ def admin_dashboard():
             margin-top: 40px;
             color: #94a3b8;
             font-size: 12px;
+        }}
+        
+        @keyframes spin {{
+            0% {{ transform: rotate(0deg); }}
+            100% {{ transform: rotate(360deg); }}
+        }}
+        
+        /* Modal Styles */
+        .modal {{
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+        }}
+        
+        .modal-content {{
+            background-color: white;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: modalSlideIn 0.3s ease-out;
+        }}
+        
+        @keyframes modalSlideIn {{
+            from {{
+                opacity: 0;
+                transform: translateY(-50px) scale(0.9);
+            }}
+            to {{
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }}
+        }}
+        
+        .modal-header {{
+            background: linear-gradient(135deg, #8B5CF6, #3B82F6);
+            color: white;
+            padding: 24px;
+            border-radius: 20px 20px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+        
+        .modal-title {{
+            font-size: 20px;
+            font-weight: 700;
+            margin: 0;
+        }}
+        
+        .close {{
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            opacity: 0.8;
+            transition: opacity 0.3s ease;
+        }}
+        
+        .close:hover {{
+            opacity: 1;
+        }}
+        
+        .modal-body {{
+            padding: 32px;
+        }}
+        
+        .form-group {{
+            margin-bottom: 24px;
+        }}
+        
+        .form-label {{
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+        }}
+        
+        .form-input {{
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }}
+        
+        .form-input:focus {{
+            outline: none;
+            border-color: #8B5CF6;
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+        }}
+        
+        .form-textarea {{
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 16px;
+            min-height: 100px;
+            resize: vertical;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+            font-family: inherit;
+        }}
+        
+        .form-textarea:focus {{
+            outline: none;
+            border-color: #8B5CF6;
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+        }}
+        
+        .modal-footer {{
+            padding: 24px 32px;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }}
+        
+        .btn-modal {{
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+        }}
+        
+        .btn-primary {{
+            background: linear-gradient(135deg, #8B5CF6, #3B82F6);
+            color: white;
+        }}
+        
+        .btn-primary:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.3);
+        }}
+        
+        .btn-secondary {{
+            background: #f3f4f6;
+            color: #374151;
+        }}
+        
+        .btn-secondary:hover {{
+            background: #e5e7eb;
+        }}
+        
+        /* Form Help Text */
+        .form-help {{
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 4px;
+            font-style: italic;
+        }}
+        
+        /* SMS Preview Styles */
+        .sms-preview {{
+            margin-top: 24px;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+        }}
+        
+        .sms-preview h4 {{
+            margin: 0 0 16px 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #374151;
+        }}
+        
+        .preview-content {{
+            background: white;
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid #d1d5db;
+        }}
+        
+        .preview-phone {{
+            font-size: 14px;
+            font-weight: 600;
+            color: #059669;
+            margin-bottom: 8px;
+        }}
+        
+        .preview-message {{
+            font-size: 14px;
+            color: #374151;
+            line-height: 1.5;
+            background: #f3f4f6;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 3px solid #8B5CF6;
         }}
         
         @media (max-width: 768px) {{
@@ -921,10 +1163,6 @@ def admin_dashboard():
                         <div class="sidebar-text">View Responses</div>
                     </div>
                     
-                    <div class="sidebar-item" onclick="window.location.href='/admin/analytics'">
-                        <div class="sidebar-icon">📊</div>
-                        <div class="sidebar-text">Personal Analytics</div>
-                    </div>
                 </div>
                 
                 <!-- System Status -->
@@ -950,54 +1188,290 @@ def admin_dashboard():
         </div>
     </div>
     
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add New User</h2>
+                <span class="close" onclick="closeModal('addUserModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="userName">Full Name</label>
+                    <input type="text" id="userName" class="form-input" placeholder="Enter user's full name" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="userPhone">Phone Number</label>
+                    <input type="tel" id="userPhone" class="form-input" placeholder="+1234567890" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-modal btn-secondary" onclick="closeModal('addUserModal')">Cancel</button>
+                <button class="btn-modal btn-primary" onclick="submitAddUser()">Add User</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Campaign Modal -->
+    <div id="addCampaignModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Create New Campaign</h2>
+                <span class="close" onclick="closeModal('addCampaignModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="campaignName">Campaign Name</label>
+                    <input type="text" id="campaignName" class="form-input" placeholder="Enter campaign name" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="campaignDescription">Description</label>
+                    <textarea id="campaignDescription" class="form-textarea" placeholder="Enter campaign description (optional)"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-modal btn-secondary" onclick="closeModal('addCampaignModal')">Cancel</button>
+                <button class="btn-modal btn-primary" onclick="submitAddCampaign()">Create Campaign</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Send Test SMS Modal -->
+    <div id="sendSMSModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Send Test SMS</h2>
+                <span class="close" onclick="closeModal('sendSMSModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="smsPhone">Phone Number</label>
+                    <input type="tel" id="smsPhone" class="form-input" placeholder="+1234567890" required>
+                    <div class="form-help">Enter the phone number in international format (e.g., +1234567890)</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="smsMessage">Custom Message (Optional)</label>
+                    <textarea id="smsMessage" class="form-textarea" placeholder="Leave empty to send default survey message"></textarea>
+                    <div class="form-help">If left empty, the default wellbeing survey will be sent</div>
+                </div>
+                <div class="sms-preview">
+                    <h4>Preview:</h4>
+                    <div class="preview-content">
+                        <div class="preview-phone">📱 <span id="previewPhone">+1234567890</span></div>
+                        <div class="preview-message" id="previewMessage">Default survey message will appear here...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-modal btn-secondary" onclick="closeModal('sendSMSModal')">Cancel</button>
+                <button class="btn-modal btn-primary" onclick="submitSendSMS()">Send SMS</button>
+            </div>
+        </div>
+    </div>
+    
     <script>
         function sendTestSMS() {{
-            const phone = prompt('Enter phone number to send test SMS:');
-            if (phone) {{
-                fetch('/admin/send-test-sms', {{
-                    method: 'POST',
-                    headers: {{'Content-Type': 'application/json'}},
-                    body: JSON.stringify({{phone: phone}})
-                }})
-                .then(response => response.json())
-                .then(data => {{
-                    alert(data.message);
-                }});
+            document.getElementById('sendSMSModal').style.display = 'block';
+            document.getElementById('smsPhone').focus();
+            updateSMSPreview();
+        }}
+        
+        function submitSendSMS() {{
+            const phone = document.getElementById('smsPhone').value.trim();
+            const message = document.getElementById('smsMessage').value.trim();
+            
+            if (!phone) {{
+                alert('Please enter a phone number');
+                return;
+            }}
+            
+            // Show loading state
+            const submitBtn = document.querySelector('#sendSMSModal .btn-primary');
+            const originalText = submitBtn.textContent;
+            submitBtn.innerHTML = '<div style="display: inline-block; width: 16px; height: 16px; border: 2px solid white; border-radius: 50%; border-top-color: transparent; animation: spin 1s linear infinite; margin-right: 8px;"></div>Sending...';
+            submitBtn.disabled = true;
+            
+            const payload = {{phone: phone}};
+            if (message) {{
+                payload.message = message;
+            }}
+            
+            fetch('/admin/send-test-sms', {{
+                method: 'POST',
+                headers: {{'Content-Type': 'application/json'}},
+                body: JSON.stringify(payload)
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+                if (data.success) {{
+                    alert('✅ ' + data.message);
+                    closeModal('sendSMSModal');
+                }} else {{
+                    alert('❌ Error: ' + (data.error || 'Failed to send SMS'));
+                }}
+            }})
+            .catch(error => {{
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+                alert('❌ Error: Failed to send SMS. Please try again.');
+                console.error('Error:', error);
+            }});
+        }}
+        
+        function updateSMSPreview() {{
+            const phone = document.getElementById('smsPhone').value || '+1234567890';
+            const message = document.getElementById('smsMessage').value;
+            
+            document.getElementById('previewPhone').textContent = phone;
+            
+            if (message) {{
+                document.getElementById('previewMessage').textContent = message;
+            }} else {{
+                document.getElementById('previewMessage').textContent = 'Hi! Please rate your wellbeing from yesterday on a scale of 1-10:\\n\\n1. How much joy did you experience?\\n2. How much achievement did you feel?\\n3. How much meaningfulness did you find?\\n\\nReply with your ratings and any thoughts!';
             }}
         }}
         
         function showAddUserForm() {{
-            const name = prompt('Enter user name:');
-            const phone = prompt('Enter phone number:');
-            if (name && phone) {{
-                fetch('/admin/add-user', {{
-                    method: 'POST',
-                    headers: {{'Content-Type': 'application/json'}},
-                    body: JSON.stringify({{name: name, phone: phone}})
-                }})
-                .then(response => response.json())
-                .then(data => {{
-                    alert(data.message);
-                    if (data.success) location.reload();
-                }});
+            document.getElementById('addUserModal').style.display = 'block';
+            document.getElementById('userName').focus();
+        }}
+        
+        function submitAddUser() {{
+            const name = document.getElementById('userName').value.trim();
+            const phone = document.getElementById('userPhone').value.trim();
+            
+            if (!name || !phone) {{
+                alert('Please fill in all required fields');
+                return;
             }}
+            
+            // Show loading state
+            const submitBtn = document.querySelector('#addUserModal .btn-primary');
+            const originalText = submitBtn.textContent;
+            submitBtn.innerHTML = '<div style="display: inline-block; width: 16px; height: 16px; border: 2px solid white; border-radius: 50%; border-top-color: transparent; animation: spin 1s linear infinite; margin-right: 8px;"></div>Adding...';
+            submitBtn.disabled = true;
+            
+            fetch('/admin/add-user', {{
+                method: 'POST',
+                headers: {{'Content-Type': 'application/json'}},
+                body: JSON.stringify({{name: name, phone: phone}})
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+                if (data.success) {{
+                    alert('✅ ' + data.message);
+                    closeModal('addUserModal');
+                    location.reload();
+                }} else {{
+                    alert('❌ Error: ' + (data.error || 'Failed to add user'));
+                }}
+            }})
+            .catch(error => {{
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+                alert('❌ Error: Failed to add user. Please try again.');
+                console.error('Error:', error);
+            }});
         }}
         
         function showAddCampaignForm() {{
-            const name = prompt('Enter campaign name:');
-            if (name) {{
-                fetch('/admin/add-campaign', {{
-                    method: 'POST',
-                    headers: {{'Content-Type': 'application/json'}},
-                    body: JSON.stringify({{name: name}})
-                }})
-                .then(response => response.json())
-                .then(data => {{
-                    alert(data.message);
-                    if (data.success) location.reload();
-                }});
+            document.getElementById('addCampaignModal').style.display = 'block';
+            document.getElementById('campaignName').focus();
+        }}
+        
+        function submitAddCampaign() {{
+            const name = document.getElementById('campaignName').value.trim();
+            const description = document.getElementById('campaignDescription').value.trim();
+            
+            if (!name) {{
+                alert('Please enter a campaign name');
+                return;
+            }}
+            
+            // Show loading state
+            const submitBtn = document.querySelector('#addCampaignModal .btn-primary');
+            const originalText = submitBtn.textContent;
+            submitBtn.innerHTML = '<div style="display: inline-block; width: 16px; height: 16px; border: 2px solid white; border-radius: 50%; border-top-color: transparent; animation: spin 1s linear infinite; margin-right: 8px;"></div>Creating...';
+            submitBtn.disabled = true;
+            
+            fetch('/admin/add-campaign', {{
+                method: 'POST',
+                headers: {{'Content-Type': 'application/json'}},
+                body: JSON.stringify({{name: name, description: description}})
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+                if (data.success) {{
+                    alert('✅ ' + data.message);
+                    closeModal('addCampaignModal');
+                    location.reload();
+                }} else {{
+                    alert('❌ Error: ' + (data.error || 'Failed to create campaign'));
+                }}
+            }})
+            .catch(error => {{
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+                alert('❌ Error: Failed to create campaign. Please try again.');
+                console.error('Error:', error);
+            }});
+        }}
+        
+        function closeModal(modalId) {{
+            document.getElementById(modalId).style.display = 'none';
+            // Clear form fields
+            if (modalId === 'addUserModal') {{
+                document.getElementById('userName').value = '';
+                document.getElementById('userPhone').value = '';
+            }} else if (modalId === 'addCampaignModal') {{
+                document.getElementById('campaignName').value = '';
+                document.getElementById('campaignDescription').value = '';
+            }} else if (modalId === 'sendSMSModal') {{
+                document.getElementById('smsPhone').value = '';
+                document.getElementById('smsMessage').value = '';
             }}
         }}
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {{
+            const modals = document.querySelectorAll('.modal');
+            modals.forEach(modal => {{
+                if (event.target === modal) {{
+                    modal.style.display = 'none';
+                }}
+            }});
+        }}
+        
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(event) {{
+            if (event.key === 'Escape') {{
+                const modals = document.querySelectorAll('.modal');
+                modals.forEach(modal => {{
+                    if (modal.style.display === 'block') {{
+                        modal.style.display = 'none';
+                    }}
+                }});
+            }}
+        }});
+        
+        // Initialize SMS modal event listeners when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {{
+            const smsPhone = document.getElementById('smsPhone');
+            const smsMessage = document.getElementById('smsMessage');
+            
+            if (smsPhone) {{
+                smsPhone.addEventListener('input', updateSMSPreview);
+            }}
+            if (smsMessage) {{
+                smsMessage.addEventListener('input', updateSMSPreview);
+            }}
+        }});
     </script>
 </body>
 </html>
@@ -1007,41 +1481,56 @@ def admin_dashboard():
 def admin_users():
     users = User.query.all()
     
-    # Create sample data for demonstration
-    sample_users = [
-        {
-            'name': 'Sarah Johnson',
-            'phone': '+1 (555) 123-4567',
-            'status': 'Active',
-            'responses': 28,
-            'last_response': '2 hours ago',
-            'joined': '1/14/2024'
-        },
-        {
-            'name': 'Mike Chen',
-            'phone': '+1 (555) 234-5678',
-            'status': 'Active',
-            'responses': 22,
-            'last_response': '1 day ago',
-            'joined': '1/9/2024'
-        },
-        {
-            'name': 'Emily Rodriguez',
-            'phone': '+1 (555) 345-6789',
-            'status': 'Inactive',
-            'responses': 15,
-            'last_response': '1 week ago',
-            'joined': '12/19/2023'
-        },
-        {
-            'name': 'David Kim',
-            'phone': '+1 (555) 456-7890',
-            'status': 'Active',
-            'responses': 31,
-            'last_response': '3 hours ago',
-            'joined': '1/5/2024'
-        }
-    ]
+    # Convert database users to display format
+    user_data = []
+    for user in users:
+        # Count responses for this user
+        response_count = Response.query.filter_by(user_id=user.id).count()
+        
+        # Get last response date
+        last_response = Response.query.filter_by(user_id=user.id).order_by(Response.submitted_at.desc()).first()
+        if last_response and last_response.submitted_at:
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc)
+            time_diff = now - last_response.submitted_at.replace(tzinfo=timezone.utc)
+            
+            if time_diff.days > 0:
+                last_response_text = f"{time_diff.days} day{'s' if time_diff.days > 1 else ''} ago"
+            elif time_diff.seconds > 3600:
+                hours = time_diff.seconds // 3600
+                last_response_text = f"{hours} hour{'s' if hours > 1 else ''} ago"
+            elif time_diff.seconds > 60:
+                minutes = time_diff.seconds // 60
+                last_response_text = f"{minutes} minute{'s' if minutes > 1 else ''} ago"
+            else:
+                last_response_text = "Just now"
+        else:
+            last_response_text = "Never"
+        
+        # Format joined date
+        joined_date = user.created_at.strftime('%m/%d/%Y') if hasattr(user, 'created_at') and user.created_at else 'Unknown'
+        
+        user_data.append({
+            'name': user.name,
+            'phone': user.phone_number,
+            'status': 'Active' if user.is_active else 'Inactive',
+            'responses': response_count,
+            'last_response': last_response_text,
+            'joined': joined_date
+        })
+    
+    # If no real data, show sample data for demonstration
+    if not user_data:
+        user_data = [
+            {
+                'name': 'No users yet',
+                'phone': 'N/A',
+                'status': 'Inactive',
+                'responses': 0,
+                'last_response': 'Never',
+                'joined': 'N/A'
+            }
+        ]
     
     return f"""
 <!DOCTYPE html>
@@ -1050,7 +1539,7 @@ def admin_users():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Management - SMS Survey System</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">                                                                                                 
     <style>
         * {{
             margin: 0;
@@ -1060,9 +1549,9 @@ def admin_users():
         
         body {{
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f8fafc;
+            background: linear-gradient(135deg, #5C4B99 0%, #8A7BBF 50%, #A093D1 100%);
             min-height: 100vh;
-            color: #1e293b;
+            color: white;
             line-height: 1.6;
         }}
         
@@ -1401,10 +1890,10 @@ def admin_users():
         
         <!-- Content Header -->
         <div class="content-header">
-            <div class="content-title">
-                <h2>All Users</h2>
-                <p>4 total participants</p>
-            </div>
+                   <div class="content-title">
+                       <h2>All Users</h2>
+                       <p>{len(user_data)} total participants</p>
+                   </div>
             <div class="controls">
                 <div class="search-box">
                     <span class="search-icon">🔍</span>
@@ -1463,7 +1952,7 @@ def admin_users():
                 
                 <button class="analytics-btn">View Analytics</button>
             </div>
-            ''' for user in sample_users])}
+            ''' for user in user_data])}
         </div>
     </div>
 </body>
@@ -1472,55 +1961,53 @@ def admin_users():
 
 @app.route('/admin/responses')
 def admin_responses():
-    responses = Response.query.order_by(Response.submitted_at.desc()).all()
+    responses = Response.query.join(User).join(Campaign).order_by(Response.submitted_at.desc()).all()
     
-    # Create sample data for demonstration
-    sample_responses = [
-        {
-            'user_name': 'Sarah Johnson',
-            'phone': '+1 (555) 123-4567',
-            'timestamp': '1/14/2024 at 14:32',
-            'joy_rating': 9,
-            'achievement_rating': 8,
-            'meaningfulness_rating': 9,
-            'feedback': 'Had a great team meeting and completed a major project milestone',
-            'campaign': 'Workplace Wellbeing Study',
-            'overall': 8.7
-        },
-        {
-            'user_name': 'Mike Chen',
-            'phone': '+1 (555) 234-5678',
-            'timestamp': '1/14/2024 at 09:15',
-            'joy_rating': 7,
-            'achievement_rating': 9,
-            'meaningfulness_rating': 8,
-            'feedback': 'Finished an important presentation and received positive feedback',
-            'campaign': 'Workplace Wellbeing Study',
-            'overall': 8.0
-        },
-        {
-            'user_name': 'Emily Rodriguez',
-            'phone': '+1 (555) 345-6789',
-            'timestamp': '1/13/2024 at 16:45',
-            'joy_rating': 8,
-            'achievement_rating': 7,
-            'meaningfulness_rating': 9,
-            'feedback': 'Had a meaningful conversation with a colleague about work-life balance',
-            'campaign': 'Student Mental Health Survey',
-            'overall': 8.0
-        },
-        {
-            'user_name': 'David Kim',
-            'phone': '+1 (555) 456-7890',
-            'timestamp': '1/13/2024 at 11:20',
-            'joy_rating': 6,
-            'achievement_rating': 8,
-            'meaningfulness_rating': 7,
-            'feedback': 'Completed a challenging coding project and learned new skills',
-            'campaign': 'Workplace Wellbeing Study',
-            'overall': 7.0
-        }
-    ]
+    # Convert database responses to display format
+    response_data = []
+    for response in responses:
+        overall_score = 0
+        rating_count = 0
+        
+        if response.joy_rating:
+            overall_score += response.joy_rating
+            rating_count += 1
+        if response.achievement_rating:
+            overall_score += response.achievement_rating
+            rating_count += 1
+        if response.meaningfulness_rating:
+            overall_score += response.meaningfulness_rating
+            rating_count += 1
+            
+        avg_score = overall_score / rating_count if rating_count > 0 else 0
+        
+        response_data.append({
+            'user_name': response.user.name,
+            'phone': response.user.phone_number,
+            'timestamp': response.submitted_at.strftime('%m/%d/%Y at %H:%M') if response.submitted_at else 'Unknown',
+            'joy_rating': response.joy_rating or 0,
+            'achievement_rating': response.achievement_rating or 0,
+            'meaningfulness_rating': response.meaningfulness_rating or 0,
+            'feedback': response.influence_text or 'No feedback provided',
+            'campaign': response.campaign.name,
+            'overall': round(avg_score, 1)
+        })
+    
+    # If no real data, show sample data for demonstration
+    if not response_data:
+        response_data = [
+            {
+                'user_name': 'No responses yet',
+                'phone': 'N/A',
+                'timestamp': 'N/A',
+                'joy_rating': 0,
+                'achievement_rating': 0,
+                'meaningfulness_rating': 0,
+                'feedback': 'Complete your first survey to see responses here!',
+                'campaign': 'Sample Campaign',
+                'overall': 0.0
+            }
+        ]
     
     return f"""
 <!DOCTYPE html>
@@ -1539,7 +2026,7 @@ def admin_responses():
         
         body {{
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f8fafc;
+            background: linear-gradient(135deg, #5C4B99 0%, #8A7BBF 50%, #A093D1 100%);
             min-height: 100vh;
             color: #1e293b;
             line-height: 1.6;
@@ -1905,10 +2392,10 @@ def admin_responses():
         
         <!-- Content Header -->
         <div class="content-header">
-            <div class="content-title">
-                <h2>All Responses</h2>
-                <p>4 recent responses</p>
-            </div>
+                   <div class="content-title">
+                       <h2>All Responses</h2>
+                       <p>{len(response_data)} recent responses</p>
+                   </div>
             <div class="controls">
                 <div class="search-box">
                     <span class="search-icon">🔍</span>
@@ -1927,58 +2414,58 @@ def admin_responses():
         
         <!-- Response Cards -->
         <div class="responses-grid">
-            {''.join([f'''
-            <div class="response-card">
-                <div class="response-header">
-                    <div class="user-info">
-                        <div class="user-avatar">{response['user_name'][:2].upper()}</div>
-                        <div class="user-details">
-                            <h3>{response['user_name']}</h3>
-                            <p>{response['phone']}</p>
-                        </div>
-                    </div>
-                    <div class="response-time">{response['timestamp']}</div>
-                </div>
-                
-                <div class="ratings-section">
-                    <div class="ratings">
-                        <div class="rating">
-                            <div class="rating-circle {'high' if response['joy_rating'] >= 8 else 'medium' if response['joy_rating'] >= 6 else 'low'}">
-                                <span class="rating-icon">❤️</span>
-                                {response['joy_rating']}
-                            </div>
-                            <div class="rating-label">Joy</div>
-                        </div>
-                        <div class="rating">
-                            <div class="rating-circle {'high' if response['achievement_rating'] >= 8 else 'medium' if response['achievement_rating'] >= 6 else 'low'}">
-                                <span class="rating-icon">🎯</span>
-                                {response['achievement_rating']}
-                            </div>
-                            <div class="rating-label">Achievement</div>
-                        </div>
-                        <div class="rating">
-                            <div class="rating-circle {'high' if response['meaningfulness_rating'] >= 8 else 'medium' if response['meaningfulness_rating'] >= 6 else 'low'}">
-                                <span class="rating-icon">⭐</span>
-                                {response['meaningfulness_rating']}
-                            </div>
-                            <div class="rating-label">Meaningfulness</div>
-                        </div>
-                    </div>
-                    <div class="overall-rating">
-                        <div class="overall-score">Overall: {response['overall']}/10</div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: {response['overall'] * 10}%"></div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="feedback-section">
-                    <div class="feedback-text">"{response['feedback']}"</div>
-                </div>
-                
-                <div class="campaign-tag">{response['campaign']}</div>
-            </div>
-            ''' for response in sample_responses])}
+                   {''.join([f'''
+                   <div class="response-card">
+                       <div class="response-header">
+                           <div class="user-info">
+                               <div class="user-avatar">{response['user_name'][:2].upper()}</div>
+                               <div class="user-details">
+                                   <h3>{response['user_name']}</h3>
+                                   <p>{response['phone']}</p>
+                               </div>
+                           </div>
+                           <div class="response-time">{response['timestamp']}</div>
+                       </div>
+                       
+                       <div class="ratings-section">
+                           <div class="ratings">
+                               <div class="rating">
+                                   <div class="rating-circle {'high' if response['joy_rating'] >= 8 else 'medium' if response['joy_rating'] >= 6 else 'low'}">
+                                       <span class="rating-icon">❤️</span>
+                                       {response['joy_rating']}
+                                   </div>
+                                   <div class="rating-label">Joy</div>
+                               </div>
+                               <div class="rating">
+                                   <div class="rating-circle {'high' if response['achievement_rating'] >= 8 else 'medium' if response['achievement_rating'] >= 6 else 'low'}">
+                                       <span class="rating-icon">🎯</span>
+                                       {response['achievement_rating']}
+                                   </div>
+                                   <div class="rating-label">Achievement</div>
+                               </div>
+                               <div class="rating">
+                                   <div class="rating-circle {'high' if response['meaningfulness_rating'] >= 8 else 'medium' if response['meaningfulness_rating'] >= 6 else 'low'}">
+                                       <span class="rating-icon">⭐</span>
+                                       {response['meaningfulness_rating']}
+                                   </div>
+                                   <div class="rating-label">Meaningfulness</div>
+                               </div>
+                           </div>
+                           <div class="overall-rating">
+                               <div class="overall-score">Overall: {response['overall']}/10</div>
+                               <div class="progress-bar">
+                                   <div class="progress-fill" style="width: {response['overall'] * 10}%"></div>
+                               </div>
+                           </div>
+                       </div>
+                       
+                       <div class="feedback-section">
+                           <div class="feedback-text">"{response['feedback']}"</div>
+                       </div>
+                       
+                       <div class="campaign-tag">{response['campaign']}</div>
+                   </div>
+                   ''' for response in response_data])}
         </div>
     </div>
 </body>
@@ -1989,45 +2476,44 @@ def admin_responses():
 def admin_campaigns():
     campaigns = Campaign.query.all()
     
-    # Create sample data for demonstration
-    sample_campaigns = [
-        {
-            'name': 'Workplace Wellbeing Study',
-            'description': 'Understanding workplace satisfaction and mental health patterns',
-            'status': 'Active',
-            'participants': 89,
-            'responses': 1247,
-            'response_rate': 78.5,
-            'date_range': '12/31/2023 - 3/30/2024'
-        },
-        {
-            'name': 'Student Mental Health Survey',
-            'description': 'Tracking student wellbeing throughout the semester',
-            'status': 'Active',
-            'participants': 156,
-            'responses': 892,
-            'response_rate': 65.2,
-            'date_range': '1/14/2024 - 4/14/2024'
-        },
-        {
-            'name': 'Remote Work Impact Study',
-            'description': 'Analyzing the effects of remote work on employee wellbeing',
-            'status': 'Inactive',
-            'participants': 45,
-            'responses': 234,
-            'response_rate': 52.0,
-            'date_range': '10/1/2023 - 12/31/2023'
-        },
-        {
-            'name': 'Healthcare Worker Support',
-            'description': 'Monitoring stress and burnout in healthcare professionals',
-            'status': 'Active',
-            'participants': 78,
-            'responses': 567,
-            'response_rate': 72.7,
-            'date_range': '2/1/2024 - 5/1/2024'
-        }
-    ]
+    # Convert database campaigns to display format
+    campaign_data = []
+    for campaign in campaigns:
+        # Count participants and responses for this campaign
+        campaign_responses = Response.query.filter_by(campaign_id=campaign.id).all()
+        participants = User.query.join(Response).filter(Response.campaign_id == campaign.id).distinct().count()
+        responses = len(campaign_responses)
+        # Response rate = percentage of users who have responded to this campaign
+        response_rate = round((participants / max(User.query.count(), 1)) * 100, 1) if participants > 0 else 0
+        
+        # Format date range
+        start_date = campaign.start_date.strftime('%m/%d/%Y') if campaign.start_date else 'Not set'
+        end_date = campaign.end_date.strftime('%m/%d/%Y') if campaign.end_date else 'Not set'
+        date_range = f"{start_date} - {end_date}"
+        
+        campaign_data.append({
+            'name': campaign.name,
+            'description': campaign.description or 'No description provided',
+            'status': 'Active' if campaign.is_active else 'Inactive',
+            'participants': participants,
+            'responses': responses,
+            'response_rate': round(response_rate, 1),
+            'date_range': date_range
+        })
+    
+    # If no real data, show sample data for demonstration
+    if not campaign_data:
+        campaign_data = [
+            {
+                'name': 'Sample Campaign',
+                'description': 'Create your first campaign to get started!',
+                'status': 'Inactive',
+                'participants': 0,
+                'responses': 0,
+                'response_rate': 0.0,
+                'date_range': 'Not set - Not set'
+            }
+        ]
     
     return f"""
 <!DOCTYPE html>
@@ -2036,7 +2522,7 @@ def admin_campaigns():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Campaign Management - SMS Survey System</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">                                                                                                 
     <style>
         * {{
             margin: 0;
@@ -2046,9 +2532,9 @@ def admin_campaigns():
         
         body {{
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f8fafc;
+            background: linear-gradient(135deg, #5C4B99 0%, #8A7BBF 50%, #A093D1 100%);
             min-height: 100vh;
-            color: #1e293b;
+            color: white;
             line-height: 1.6;
         }}
         
@@ -2395,10 +2881,10 @@ def admin_campaigns():
         
         <!-- Content Header -->
         <div class="content-header">
-            <div class="content-title">
-                <h2>All Campaigns</h2>
-                <p>4 total campaigns</p>
-            </div>
+                   <div class="content-title">
+                       <h2>All Campaigns</h2>
+                       <p>{len(campaign_data)} total campaigns</p>
+                   </div>
             <div class="controls">
                 <div class="search-box">
                     <span class="search-icon">🔍</span>
@@ -2413,52 +2899,52 @@ def admin_campaigns():
         
         <!-- Campaign Cards -->
         <div class="campaigns-grid">
-            {''.join([f'''
-            <div class="campaign-card">
-                <div class="campaign-header">
-                    <div>
-                        <h3 class="campaign-title">{campaign['name']}</h3>
-                        <span class="status-badge {'status-active' if campaign['status'] == 'Active' else 'status-inactive'}">
-                            {campaign['status']}
-                        </span>
-                    </div>
-                    <div class="campaign-actions">
-                        <div class="action-icon">⏸️</div>
-                        <div class="action-icon">⋯</div>
-                    </div>
-                </div>
-                
-                <p class="campaign-description">{campaign['description']}</p>
-                
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <div class="stat-icon blue">👥</div>
-                        <div class="stat-value">{campaign['participants']}</div>
-                        <div class="stat-label">Participants</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-icon green">📊</div>
-                        <div class="stat-value">{campaign['responses']}</div>
-                        <div class="stat-label">Responses</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-icon purple">🎯</div>
-                        <div class="stat-value">{campaign['response_rate']}%</div>
-                        <div class="stat-label">Response Rate</div>
-                    </div>
-                </div>
-                
-                <div class="date-range">
-                    <span>📅</span>
-                    <span>{campaign['date_range']}</span>
-                </div>
-                
-                <div class="campaign-buttons">
-                    <button class="btn btn-outline">View Details</button>
-                    <button class="btn btn-secondary">Export Data</button>
-                </div>
-            </div>
-            ''' for campaign in sample_campaigns])}
+                   {''.join([f'''
+                   <div class="campaign-card">
+                       <div class="campaign-header">
+                           <div>
+                               <h3 class="campaign-title">{campaign['name']}</h3>
+                               <span class="status-badge {'status-active' if campaign['status'] == 'Active' else 'status-inactive'}">
+                                   {campaign['status']}
+                               </span>
+                           </div>
+                           <div class="campaign-actions">
+                               <div class="action-icon">⏸️</div>
+                               <div class="action-icon">⋯</div>
+                           </div>
+                       </div>
+                       
+                       <p class="campaign-description">{campaign['description']}</p>
+                       
+                       <div class="stats-grid">
+                           <div class="stat-item">
+                               <div class="stat-icon blue">👥</div>
+                               <div class="stat-value">{campaign['participants']}</div>
+                               <div class="stat-label">Participants</div>
+                           </div>
+                           <div class="stat-item">
+                               <div class="stat-icon green">📊</div>
+                               <div class="stat-value">{campaign['responses']}</div>
+                               <div class="stat-label">Responses</div>
+                           </div>
+                           <div class="stat-item">
+                               <div class="stat-icon purple">🎯</div>
+                               <div class="stat-value">{campaign['response_rate']}%</div>
+                               <div class="stat-label">Response Rate</div>
+                           </div>
+                       </div>
+                       
+                       <div class="date-range">
+                           <span>📅</span>
+                           <span>{campaign['date_range']}</span>
+                       </div>
+                       
+                       <div class="campaign-buttons">
+                           <button class="btn btn-outline">View Details</button>
+                           <button class="btn btn-secondary">Export Data</button>
+                       </div>
+                   </div>
+                   ''' for campaign in campaign_data])}
         </div>
     </div>
 </body>
@@ -2508,11 +2994,65 @@ def test_sms():
         logger.error(f"Error sending test SMS: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/admin/send-test-sms', methods=['POST'])
+def send_test_sms():
+    try:
+        # Handle both JSON and form data
+        if request.is_json:
+            data = request.get_json()
+            phone = data.get('phone')
+            custom_message = data.get('message')
+        else:
+            phone = request.form.get('phone')
+            custom_message = request.form.get('message')
+        
+        if not phone:
+            return jsonify({'error': 'Phone number is required'}), 400
+        
+        # Send test SMS
+        sms_service = SMSService()
+        
+        # Use custom message if provided, otherwise use default test message
+        if custom_message and custom_message.strip():
+            test_message = custom_message.strip()
+        else:
+            test_message = "Hi! Please rate your wellbeing from yesterday on a scale of 1-10:\n\n1. How much joy did you experience?\n2. How much achievement did you feel?\n3. How much meaningfulness did you find?\n\nReply with your ratings and any thoughts!"
+        
+        if sms_service.use_mock:
+            sms_service.mock_service.send_sms(
+                to=phone,
+                body=test_message,
+                from_number=sms_service.phone_number
+            )
+            return jsonify({
+                'message': f'Test SMS sent to {phone} (Mock Mode)',
+                'success': True
+            })
+        else:
+            sms_service.client.messages.create(
+                body=test_message,
+                from_=sms_service.phone_number,
+                to=phone
+            )
+            return jsonify({
+                'message': f'Test SMS sent to {phone}',
+                'success': True
+            })
+    except Exception as e:
+        logger.error(f"Error sending test SMS: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/admin/add-user', methods=['POST'])
 def add_user():
     try:
-        name = request.form.get('name')
-        phone_number = request.form.get('phone_number')
+        # Handle both JSON and form data
+        if request.is_json:
+            data = request.get_json()
+            name = data.get('name')
+            phone_number = data.get('phone')
+        else:
+            name = request.form.get('name')
+            phone_number = request.form.get('phone_number')
         
         if not name or not phone_number:
             return jsonify({'error': 'Name and phone number are required'}), 400
@@ -2543,23 +3083,38 @@ def add_user():
 @app.route('/admin/add-campaign', methods=['POST'])
 def add_campaign():
     try:
-        name = request.form.get('name')
-        start_date = request.form.get('start_date')
-        end_date = request.form.get('end_date')
+        # Handle both JSON and form data
+        if request.is_json:
+            data = request.get_json()
+            name = data.get('name')
+            description = data.get('description', '')
+            start_date = data.get('start_date')
+            end_date = data.get('end_date')
+        else:
+            name = request.form.get('name')
+            description = request.form.get('description', '')
+            start_date = request.form.get('start_date')
+            end_date = request.form.get('end_date')
         
-        if not name or not start_date or not end_date:
-            return jsonify({'error': 'Name, start date, and end date are required'}), 400
+        if not name:
+            return jsonify({'error': 'Campaign name is required'}), 400
         
-        # Parse dates
-        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-        end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
-        
-        if start_date >= end_date:
-            return jsonify({'error': 'End date must be after start date'}), 400
+        # If no dates provided, create a default campaign (active for 1 year)
+        if not start_date or not end_date:
+            start_date = date.today()
+            end_date = date.today() + timedelta(days=365)
+        else:
+            # Parse dates
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+            
+            if start_date >= end_date:
+                return jsonify({'error': 'End date must be after start date'}), 400
         
         # Create new campaign
         new_campaign = Campaign(
             name=name,
+            description=description,
             start_date=start_date,
             end_date=end_date,
             is_active=True
@@ -2808,12 +3363,36 @@ def user_feedback(user_id, campaign_id):
     avg_achievement = sum(r.achievement_rating for r in responses) / len(responses)
     avg_meaningfulness = sum(r.meaningfulness_rating for r in responses) / len(responses)
     
-    stats = {
-        'total_responses': len(responses),
-        'avg_joy': round(avg_joy, 1),
-        'avg_achievement': round(avg_achievement, 1),
-        'avg_meaningfulness': round(avg_meaningfulness, 1)
-    }
+    # Get recent responses for display
+    recent_responses = responses[:5] if responses else []
+    
+    # Build recent responses HTML
+    recent_responses_html = ""
+    if recent_responses:
+        for response in recent_responses:
+            feedback_html = f'<div class="response-feedback">"{response.influence_text}"</div>' if response.influence_text else '<div class="response-feedback">No feedback provided</div>'
+            recent_responses_html += f'''
+                <div class="response-item">
+                    <div class="response-header">
+                        <div class="response-date">{response.survey_date.strftime('%B %d, %Y') if response.survey_date else 'Unknown Date'}</div>
+                    </div>
+                    <div class="response-ratings">
+                        <div class="rating-item">
+                            <span class="rating-label">Joy:</span>
+                            <span class="rating-value">{response.joy_rating or 0}</span>
+                        </div>
+                        <div class="rating-item">
+                            <span class="rating-label">Achievement:</span>
+                            <span class="rating-value">{response.achievement_rating or 0}</span>
+                        </div>
+                        <div class="rating-item">
+                            <span class="rating-label">Meaningfulness:</span>
+                            <span class="rating-value">{response.meaningfulness_rating or 0}</span>
+                        </div>
+                    </div>
+                    {feedback_html}
+                </div>
+                '''
     
     return f"""
 <!DOCTYPE html>
@@ -2821,7 +3400,7 @@ def user_feedback(user_id, campaign_id):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analytics - {user.name} | SMS Survey System</title>
+    <title>Your Personal Analytics - SMS Survey System</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {{
@@ -2832,7 +3411,7 @@ def user_feedback(user_id, campaign_id):
         
         body {{
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f8fafc;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #ffffff 100%);
             min-height: 100vh;
             color: #1e293b;
             line-height: 1.6;
@@ -2846,163 +3425,210 @@ def user_feedback(user_id, campaign_id):
         
         .header {{
             text-align: center;
-            margin-bottom: 48px;
-            padding: 40px 0;
-            background: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%);
-            border-radius: 24px;
-            color: white;
-            position: relative;
-            overflow: hidden;
-        }}
-        
-        .header::before {{
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.1"/><circle cx="10" cy="60" r="0.5" fill="white" opacity="0.1"/><circle cx="90" cy="40" r="0.5" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
-            opacity: 0.3;
-        }}
-        
-        .header h1 {{
-            font-size: 3.5rem;
-            font-weight: 700;
-            margin-bottom: 16px;
-            text-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            position: relative;
-            z-index: 1;
-        }}
-        
-        .header p {{
-            font-size: 1.25rem;
-            color: rgba(255,255,255,0.9);
-            font-weight: 400;
-            position: relative;
-            z-index: 1;
-        }}
-        
-        .back-btn {{
-            display: inline-block;
-            padding: 12px 24px;
-            background: white;
-            color: #667eea;
-            text-decoration: none;
-            border-radius: 8px;
-            margin-bottom: 30px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }}
-        
-        .back-btn:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-        }}
-        
-        .masonry-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 24px;
-            margin-bottom: 48px;
-        }}
-        
-        .card {{
-            background: white;
-            border-radius: 20px;
-            padding: 32px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            border: 1px solid rgba(226, 232, 240, 0.8);
-            position: relative;
-            overflow: hidden;
-        }}
-        
-        .card::before {{
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, #8B5CF6, #3B82F6);
-            transform: scaleX(0);
-            transition: transform 0.3s ease;
-        }}
-        
-        .card:hover {{
-            transform: translateY(-8px);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.12);
-        }}
-        
-        .card:hover::before {{
-            transform: scaleX(1);
-        }}
-        
-        .metric-card {{
-            text-align: center;
-        }}
-        
-        .metric-icon {{
-            width: 80px;
-            height: 80px;
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 24px;
-            font-size: 32px;
-            background: linear-gradient(135deg, #8B5CF6, #3B82F6);
-            color: white;
-            box-shadow: 0 8px 20px rgba(139, 92, 246, 0.3);
-        }}
-        
-        .metric-value {{
-            font-size: 3.5rem;
-            font-weight: 700;
-            color: #1e293b;
-            margin-bottom: 8px;
-            background: linear-gradient(135deg, #8B5CF6, #3B82F6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }}
-        
-        .metric-label {{
-            color: #64748b;
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 4px;
-        }}
-        
-        .metric-description {{
-            color: #94a3b8;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }}
-        
-        .responses-section {{
-            background: white;
-            border-radius: 16px;
-            padding: 40px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
             margin-bottom: 40px;
         }}
         
-        .section-title {{
+        .header h1 {{
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 16px;
+        }}
+        
+        .header p {{
+            font-size: 1.1rem;
+            color: #64748b;
+            margin-bottom: 30px;
+        }}
+        
+        .main-card {{
+            background: white;
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+            border: 1px solid rgba(255,255,255,0.2);
+        }}
+        
+        .progress-summary {{
+            text-align: center;
+            margin-bottom: 40px;
+        }}
+        
+        .progress-title {{
             font-size: 1.8rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }}
+        
+        .progress-subtitle {{
+            font-size: 1rem;
+            color: #64748b;
+            margin-bottom: 32px;
+        }}
+        
+        .metrics-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }}
+        
+        .metric-card {{
+            background: white;
+            border-radius: 16px;
+            padding: 28px;
+            border: 1px solid #e2e8f0;
+            position: relative;
+            transition: all 0.3s ease;
+        }}
+        
+        .metric-card:hover {{
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.1);
+        }}
+        
+        .metric-card.joy {{
+            border-left: 4px solid #f59e0b;
+        }}
+        
+        .metric-card.achievement {{
+            border-left: 4px solid #10b981;
+        }}
+        
+        .metric-card.meaningfulness {{
+            border-left: 4px solid #8b5cf6;
+        }}
+        
+        .metric-name {{
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }}
+        
+        .metric-name.joy {{
+            color: #f59e0b;
+        }}
+        
+        .metric-name.achievement {{
+            color: #10b981;
+        }}
+        
+        .metric-name.meaningfulness {{
+            color: #8b5cf6;
+        }}
+        
+        .score-display {{
+            display: flex;
+            align-items: baseline;
+            margin-bottom: 20px;
+        }}
+        
+        .score-value {{
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-right: 8px;
+        }}
+        
+        .score-value.joy {{
+            color: #f59e0b;
+        }}
+        
+        .score-value.achievement {{
+            color: #10b981;
+        }}
+        
+        .score-value.meaningfulness {{
+            color: #8b5cf6;
+        }}
+        
+        .score-max {{
+            font-size: 1.2rem;
+            color: #94a3b8;
+            font-weight: 500;
+        }}
+        
+        .progress-bar-container {{
+            position: relative;
+            margin-bottom: 16px;
+        }}
+        
+        .progress-bar {{
+            width: 100%;
+            height: 12px;
+            background: #f1f5f9;
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }}
+        
+        .progress-fill {{
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+            border-radius: 6px;
+            transition: width 0.8s ease;
+        }}
+        
+        .threshold-line {{
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 2px;
+            background: #64748b;
+            z-index: 2;
+        }}
+        
+        .threshold-label {{
+            position: absolute;
+            top: -24px;
+            font-size: 0.75rem;
+            color: #64748b;
+            font-weight: 500;
+        }}
+        
+        .status-message {{
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }}
+        
+        .status-message.above {{
+            color: #059669;
+        }}
+        
+        .status-message.below {{
+            color: #374151;
+        }}
+        
+        .checkmark {{
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+        }}
+        
+        .recent-responses {{
+            margin-top: 40px;
+        }}
+        
+        .section-title {{
+            font-size: 1.5rem;
             font-weight: 600;
-            color: #333;
+            color: #1e293b;
             margin-bottom: 24px;
         }}
         
-        .response-card {{
-            background: #f8f9fa;
+        .responses-list {{
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }}
+        
+        .response-item {{
+            background: #f8fafc;
             border-radius: 12px;
             padding: 20px;
-            margin-bottom: 16px;
-            border-left: 4px solid #667eea;
+            border-left: 4px solid #10B981;
         }}
         
         .response-header {{
@@ -3013,128 +3639,64 @@ def user_feedback(user_id, campaign_id):
         }}
         
         .response-date {{
-            color: #666;
             font-size: 0.9rem;
+            color: #64748b;
+            font-weight: 500;
         }}
         
         .response-ratings {{
             display: flex;
-            gap: 20px;
+            gap: 16px;
             margin-bottom: 12px;
         }}
         
-        .rating {{
-            text-align: center;
+        .rating-item {{
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.9rem;
         }}
         
         .rating-value {{
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #667eea;
+            font-weight: 600;
+            color: #1e293b;
         }}
         
-        .rating-label {{
-            font-size: 0.8rem;
-            color: #666;
-        }}
-        
-        .influence {{
-            color: #333;
+        .response-feedback {{
             font-style: italic;
-            background: #e9ecef;
+            color: #374151;
+            background: white;
             padding: 12px;
             border-radius: 8px;
+            border: 1px solid #e2e8f0;
         }}
         
-        .insights-section {{
-            background: white;
-            border-radius: 16px;
-            padding: 40px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        .empty-state {{
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
         }}
         
-        .insight-item {{
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 16px;
-            border-left: 4px solid #28a745;
-        }}
-        
-        .insight-title {{
+        .empty-state h3 {{
+            font-size: 1.3rem;
             font-weight: 600;
-            color: #333;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
+            color: #1e293b;
         }}
         
-        .insight-text {{
-            color: #666;
+        .empty-state p {{
+            font-size: 1rem;
+            line-height: 1.6;
         }}
-        
-        .floating-action {{
-            position: fixed;
-            bottom: 32px;
-            right: 32px;
-            width: 64px;
-            height: 64px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #8B5CF6, #3B82F6);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            box-shadow: 0 8px 30px rgba(139, 92, 246, 0.4);
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 1000;
-        }}
-        
-        .floating-action:hover {{
-            transform: scale(1.1);
-            box-shadow: 0 12px 40px rgba(139, 92, 246, 0.5);
-        }}
-        
-        @keyframes fadeInUp {{
-            from {{
-                opacity: 0;
-                transform: translateY(30px);
-            }}
-            to {{
-                opacity: 1;
-                transform: translateY(0);
-            }}
-        }}
-        
-        .card {{
-            animation: fadeInUp 0.6s ease-out;
-        }}
-        
-        .card:nth-child(1) {{ animation-delay: 0.1s; }}
-        .card:nth-child(2) {{ animation-delay: 0.2s; }}
-        .card:nth-child(3) {{ animation-delay: 0.3s; }}
-        .card:nth-child(4) {{ animation-delay: 0.4s; }}
         
         @media (max-width: 768px) {{
-            .header h1 {{
-                font-size: 2.5rem;
-            }}
-            
-            .container {{
-                padding: 20px 16px;
+            .metrics-grid {{
+                grid-template-columns: 1fr;
             }}
             
             .response-ratings {{
                 flex-direction: column;
-                gap: 10px;
-            }}
-            
-            .floating-action {{
-                bottom: 20px;
-                right: 20px;
-                width: 56px;
-                height: 56px;
-                font-size: 20px;
+                gap: 8px;
             }}
         }}
     </style>
@@ -3142,212 +3704,88 @@ def user_feedback(user_id, campaign_id):
 <body>
     <div class="container">
         <div class="header">
-            <h1>Your Wellbeing Insights</h1>
-            <p>Hi {user.name}! Here's how you're doing</p>
+            <h1>Live Demo Visualization</h1>
+            <p>See how users track their weekly progress across the three key wellness dimensions.</p>
         </div>
         
-        <div class="masonry-grid">
-            <div class="card metric-card">
-                <div class="metric-icon">😊</div>
-                <div class="metric-value">{avg_joy:.1f}</div>
-                <div class="metric-label">Average Joy</div>
-                <div class="metric-description">Out of 10</div>
+        <div class="main-card">
+            <div class="progress-summary">
+                <h2 class="progress-title">Week 1 Progress Summary</h2>
+                <p class="progress-subtitle">Based on {len(responses)} days of survey responses</p>
             </div>
             
-            <div class="card metric-card">
-                <div class="metric-icon">🎯</div>
-                <div class="metric-value">{avg_achievement:.1f}</div>
-                <div class="metric-label">Average Achievement</div>
-                <div class="metric-description">Out of 10</div>
+            <div class="metrics-grid">
+                <div class="metric-card joy">
+                    <div class="metric-name joy">Joy</div>
+                    <div class="score-display">
+                        <div class="score-value joy">{int(avg_joy * 7)}</div>
+                        <div class="score-max">/70</div>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: {(avg_joy * 7 / 70) * 100}%"></div>
+                            <div class="threshold-line" style="left: {(45 / 70) * 100}%"></div>
+                            <div class="threshold-label" style="left: {(45 / 70) * 100}%">Threshold: 45</div>
+                        </div>
+                    </div>
+                    <div class="status-message {'above' if avg_joy * 7 >= 45 else 'below'}">
+                        {'<svg class="checkmark" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>' if avg_joy * 7 >= 45 else ''}
+                        {'Above recommended threshold' if avg_joy * 7 >= 45 else f'{int(45 - avg_joy * 7)} points to reach threshold'}
+                    </div>
+                </div>
+                
+                <div class="metric-card achievement">
+                    <div class="metric-name achievement">Achievement</div>
+                    <div class="score-display">
+                        <div class="score-value achievement">{int(avg_achievement * 7)}</div>
+                        <div class="score-max">/70</div>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: {(avg_achievement * 7 / 70) * 100}%"></div>
+                            <div class="threshold-line" style="left: {(42 / 70) * 100}%"></div>
+                            <div class="threshold-label" style="left: {(42 / 70) * 100}%">Threshold: 42</div>
+                        </div>
+                    </div>
+                    <div class="status-message {'above' if avg_achievement * 7 >= 42 else 'below'}">
+                        {'<svg class="checkmark" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>' if avg_achievement * 7 >= 42 else ''}
+                        {'Above recommended threshold' if avg_achievement * 7 >= 42 else f'{int(42 - avg_achievement * 7)} points to reach threshold'}
+                    </div>
+                </div>
+                
+                <div class="metric-card meaningfulness">
+                    <div class="metric-name meaningfulness">Meaningfulness</div>
+                    <div class="score-display">
+                        <div class="score-value meaningfulness">{int(avg_meaningfulness * 7)}</div>
+                        <div class="score-max">/70</div>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: {(avg_meaningfulness * 7 / 70) * 100}%"></div>
+                            <div class="threshold-line" style="left: {(49 / 70) * 100}%"></div>
+                            <div class="threshold-label" style="left: {(49 / 70) * 100}%">Threshold: 49</div>
+                        </div>
+                    </div>
+                    <div class="status-message {'above' if avg_meaningfulness * 7 >= 49 else 'below'}">
+                        {'<svg class="checkmark" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>' if avg_meaningfulness * 7 >= 49 else ''}
+                        {'Above recommended threshold' if avg_meaningfulness * 7 >= 49 else f'{int(49 - avg_meaningfulness * 7)} points to reach threshold'}
+                    </div>
+                </div>
             </div>
             
-            <div class="card metric-card">
-                <div class="metric-icon">💫</div>
-                <div class="metric-value">{avg_meaningfulness:.1f}</div>
-                <div class="metric-label">Average Meaningfulness</div>
-                <div class="metric-description">Out of 10</div>
-            </div>
-        </div>
-        
-        <div class="responses-section">
-            <h2 class="section-title">Recent Responses ({len(responses)})</h2>
-            {"".join([f'''
-            <div class="response-card">
-                <div class="response-header">
-                    <strong>Response #{i+1}</strong>
-                    <span class="response-date">{response.submitted_at.strftime('%Y-%m-%d %H:%M') if response.submitted_at else 'N/A'}</span>
+            {f'''
+            <div class="recent-responses">
+                <h3 class="section-title">Recent Responses</h3>
+                <div class="responses-list">
+                    {recent_responses_html}
                 </div>
-                <div class="response-ratings">
-                    <div class="rating">
-                        <div class="rating-value">{response.joy_rating or 'N/A'}</div>
-                        <div class="rating-label">Joy</div>
-                    </div>
-                    <div class="rating">
-                        <div class="rating-value">{response.achievement_rating or 'N/A'}</div>
-                        <div class="rating-label">Achievement</div>
-                    </div>
-                    <div class="rating">
-                        <div class="rating-value">{response.meaningfulness_rating or 'N/A'}</div>
-                        <div class="rating-label">Meaningfulness</div>
-                    </div>
-                </div>
-                <div class="influence">"{response.influence_text or 'No influence text'}"</div>
             </div>
-            ''' for i, response in enumerate(responses)])}
+            ''' if recent_responses_html else ''}
         </div>
-        
-        <div class="insights-section">
-            <h2 class="section-title">Your Personal Insights</h2>
-            <div class="insight-item">
-                <div class="insight-title">🌟 Your Overall Wellbeing</div>
-                <div class="insight-text">Based on your {len(responses)} response{'s' if len(responses) > 1 else ''}, your average wellbeing score is {((avg_joy + avg_achievement + avg_meaningfulness) / 3):.1f}/10. Keep up the great work!</div>
-            </div>
-            <div class="insight-item">
-                <div class="insight-title">💪 Your Strength</div>
-                <div class="insight-text">{"Joy" if avg_joy >= avg_achievement and avg_joy >= avg_meaningfulness else "Achievement" if avg_achievement >= avg_meaningfulness else "Meaningfulness"} is your strongest area at {max(avg_joy, avg_achievement, avg_meaningfulness):.1f}/10. This is something to celebrate!</div>
-            </div>
-            <div class="insight-item">
-                <div class="insight-title">🎯 Growth Opportunity</div>
-                <div class="insight-text">{"Joy" if avg_joy <= avg_achievement and avg_joy <= avg_meaningfulness else "Achievement" if avg_achievement <= avg_meaningfulness else "Meaningfulness"} is at {min(avg_joy, avg_achievement, avg_meaningfulness):.1f}/10. Small daily actions can help boost this area!</div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="floating-action" onclick="window.scrollTo({{top: 0, behavior: 'smooth'}})">
-        ↑
     </div>
 </body>
 </html>
-    """
-
-# ============================================================================
-# TEMPLATES (Inline HTML)
-# ============================================================================
-
-
-# ============================================================================
-# REACT FRONTEND INTEGRATION
-# ============================================================================
-
-@app.route('/react')
-@app.route('/react/<path:path>')
-def serve_react_app(path=''):
-    """Serve the React application"""
-    if path and os.path.exists(os.path.join('static', path)):
-        return send_from_directory('static', path)
-    return send_from_directory('static', 'index.html')
-
-# API Endpoints for React Frontend
-@app.route('/api/stats')
-def api_stats():
-    """Get dashboard statistics for React frontend"""
-    try:
-        users = User.query.all()
-        campaigns = Campaign.query.all()
-        responses = Response.query.all()
-        
-        # Calculate statistics
-        total_users = len(users)
-        active_users = len([u for u in users if u.is_active])
-        total_campaigns = len(campaigns)
-        total_responses = len(responses)
-        
-        # Calculate response rate (simplified)
-        response_rate = (total_responses / max(total_users, 1)) * 100
-        
-        # Calculate average wellbeing score
-        if responses:
-            avg_joy = sum(r.joy_rating for r in responses if r.joy_rating) / len([r for r in responses if r.joy_rating])
-            avg_achievement = sum(r.achievement_rating for r in responses if r.achievement_rating) / len([r for r in responses if r.achievement_rating])
-            avg_meaningfulness = sum(r.meaningfulness_rating for r in responses if r.meaningfulness_rating) / len([r for r in responses if r.meaningfulness_rating])
-            avg_wellbeing = (avg_joy + avg_achievement + avg_meaningfulness) / 3
-        else:
-            avg_wellbeing = 0
-        
-        stats = {
-            'totalUsers': total_users,
-            'activeUsers': active_users,
-            'totalCampaigns': total_campaigns,
-            'totalResponses': total_responses,
-            'responseRate': round(response_rate, 1),
-            'avgWellbeingScore': round(avg_wellbeing, 1)
-        }
-        
-        return jsonify(stats)
-    except Exception as e:
-        logger.error(f"Error getting stats: {e}")
-        return jsonify({'error': 'Failed to get statistics'}), 500
-
-@app.route('/api/users')
-def api_users():
-    """Get all users for React frontend"""
-    try:
-        users = User.query.all()
-        users_data = []
-        for user in users:
-            user_data = {
-                'id': user.id,
-                'name': user.name,
-                'phoneNumber': user.phone_number,
-                'isActive': user.is_active,
-                'createdAt': user.created_at.isoformat() if user.created_at else None,
-                'responseCount': len(user.responses)
-            }
-            users_data.append(user_data)
-        
-        return jsonify(users_data)
-    except Exception as e:
-        logger.error(f"Error getting users: {e}")
-        return jsonify({'error': 'Failed to get users'}), 500
-
-@app.route('/api/campaigns')
-def api_campaigns():
-    """Get all campaigns for React frontend"""
-    try:
-        campaigns = Campaign.query.all()
-        campaigns_data = []
-        for campaign in campaigns:
-            campaign_data = {
-                'id': campaign.id,
-                'name': campaign.name,
-                'startDate': campaign.start_date.isoformat() if campaign.start_date else None,
-                'endDate': campaign.end_date.isoformat() if campaign.end_date else None,
-                'isActive': campaign.is_active,
-                'responseCount': len(campaign.responses)
-            }
-            campaigns_data.append(campaign_data)
-        
-        return jsonify(campaigns_data)
-    except Exception as e:
-        logger.error(f"Error getting campaigns: {e}")
-        return jsonify({'error': 'Failed to get campaigns'}), 500
-
-@app.route('/api/responses')
-def api_responses():
-    """Get all responses for React frontend"""
-    try:
-        responses = Response.query.order_by(Response.submitted_at.desc()).limit(50).all()
-        responses_data = []
-        for response in responses:
-            response_data = {
-                'id': response.id,
-                'userId': response.user_id,
-                'userName': response.user.name if response.user else 'Unknown',
-                'campaignId': response.campaign_id,
-                'campaignName': response.campaign.name if response.campaign else 'Unknown',
-                'joyRating': response.joy_rating,
-                'achievementRating': response.achievement_rating,
-                'meaningfulnessRating': response.meaningfulness_rating,
-                'influenceText': response.influence_text,
-                'submittedAt': response.submitted_at.isoformat() if response.submitted_at else None,
-                'surveyDate': response.survey_date.isoformat() if response.survey_date else None
-            }
-            responses_data.append(response_data)
-        
-        return jsonify(responses_data)
-    except Exception as e:
-        logger.error(f"Error getting responses: {e}")
-        return jsonify({'error': 'Failed to get responses'}), 500
+        """
 
 @app.route('/api/analytics/<int:user_id>/<int:campaign_id>')
 def api_analytics(user_id, campaign_id):
@@ -3499,7 +3937,7 @@ def personal_analytics(user_id):
         
         body {{
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #ffffff 100%);
             min-height: 100vh;
             color: #1e293b;
             line-height: 1.6;
@@ -3519,125 +3957,184 @@ def personal_analytics(user_id):
         .header h1 {{
             font-size: 2.5rem;
             font-weight: 700;
-            color: white;
+            color: #1e293b;
             margin-bottom: 16px;
         }}
         
         .header p {{
             font-size: 1.1rem;
-            color: rgba(255, 255, 255, 0.9);
+            color: #64748b;
             margin-bottom: 30px;
         }}
         
-        .content {{
+        .main-card {{
             background: white;
-            border-radius: 20px;
+            border-radius: 24px;
             padding: 40px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+            border: 1px solid rgba(255,255,255,0.2);
         }}
         
-        .welcome-section {{
+        .progress-summary {{
             text-align: center;
             margin-bottom: 40px;
-            padding-bottom: 30px;
-            border-bottom: 1px solid #e2e8f0;
         }}
         
-        .welcome-section h2 {{
+        .progress-title {{
             font-size: 1.8rem;
-            font-weight: 600;
+            font-weight: 700;
             color: #1e293b;
             margin-bottom: 8px;
         }}
         
-        .welcome-section p {{
-            color: #64748b;
+        .progress-subtitle {{
             font-size: 1rem;
-        }}
-        
-        .overall-score {{
-            background: linear-gradient(135deg, #10B981, #059669);
-            color: white;
-            border-radius: 16px;
-            padding: 30px;
-            text-align: center;
-            margin-bottom: 40px;
-        }}
-        
-        .overall-score h3 {{
-            font-size: 1.2rem;
-            font-weight: 500;
-            margin-bottom: 16px;
-            opacity: 0.9;
-        }}
-        
-        .score-circle {{
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 16px;
-            position: relative;
-        }}
-        
-        .score-value {{
-            font-size: 2.5rem;
-            font-weight: 700;
-        }}
-        
-        .score-label {{
-            font-size: 0.9rem;
-            opacity: 0.9;
+            color: #64748b;
+            margin-bottom: 32px;
         }}
         
         .metrics-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 24px;
             margin-bottom: 40px;
         }}
         
         .metric-card {{
-            background: #f8fafc;
-            border-radius: 12px;
-            padding: 24px;
-            text-align: center;
+            background: white;
+            border-radius: 16px;
+            padding: 28px;
             border: 1px solid #e2e8f0;
+            position: relative;
+            transition: all 0.3s ease;
         }}
         
-        .metric-icon {{
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 16px;
-            font-size: 24px;
+        .metric-card:hover {{
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.1);
         }}
         
-        .metric-icon.joy {{ background: #fef3c7; color: #92400e; }}
-        .metric-icon.achievement {{ background: #dbeafe; color: #1e40af; }}
-        .metric-icon.meaningfulness {{ background: #e0e7ff; color: #3730a3; }}
+        .metric-card.joy {{
+            border-left: 4px solid #f59e0b;
+        }}
         
-        .metric-value {{
-            font-size: 2rem;
+        .metric-card.achievement {{
+            border-left: 4px solid #10b981;
+        }}
+        
+        .metric-card.meaningfulness {{
+            border-left: 4px solid #8b5cf6;
+        }}
+        
+        .metric-name {{
+            font-size: 1.1rem;
             font-weight: 700;
-            color: #1e293b;
-            margin-bottom: 8px;
+            margin-bottom: 16px;
         }}
         
-        .metric-label {{
-            font-size: 0.9rem;
+        .metric-name.joy {{
+            color: #f59e0b;
+        }}
+        
+        .metric-name.achievement {{
+            color: #10b981;
+        }}
+        
+        .metric-name.meaningfulness {{
+            color: #8b5cf6;
+        }}
+        
+        .score-display {{
+            display: flex;
+            align-items: baseline;
+            margin-bottom: 20px;
+        }}
+        
+        .score-value {{
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-right: 8px;
+        }}
+        
+        .score-value.joy {{
+            color: #f59e0b;
+        }}
+        
+        .score-value.achievement {{
+            color: #10b981;
+        }}
+        
+        .score-value.meaningfulness {{
+            color: #8b5cf6;
+        }}
+        
+        .score-max {{
+            font-size: 1.2rem;
+            color: #94a3b8;
+            font-weight: 500;
+        }}
+        
+        .progress-bar-container {{
+            position: relative;
+            margin-bottom: 16px;
+        }}
+        
+        .progress-bar {{
+            width: 100%;
+            height: 12px;
+            background: #f1f5f9;
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }}
+        
+        .progress-fill {{
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+            border-radius: 6px;
+            transition: width 0.8s ease;
+        }}
+        
+        .threshold-line {{
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 2px;
+            background: #64748b;
+            z-index: 2;
+        }}
+        
+        .threshold-label {{
+            position: absolute;
+            top: -24px;
+            font-size: 0.75rem;
             color: #64748b;
             font-weight: 500;
         }}
         
+        .status-message {{
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }}
+        
+        .status-message.above {{
+            color: #059669;
+        }}
+        
+        .status-message.below {{
+            color: #374151;
+        }}
+        
+        .checkmark {{
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+        }}
+        
         .recent-responses {{
-            margin-bottom: 40px;
+            margin-top: 40px;
         }}
         
         .section-title {{
@@ -3764,40 +4261,73 @@ def personal_analytics(user_id):
 <body>
     <div class="container">
         <div class="header">
-            <h1>Your Personal Analytics</h1>
-            <p>Track your wellbeing journey and insights</p>
+            <h1>Live Demo Visualization</h1>
+            <p>See how users track their weekly progress across the three key wellness dimensions.</p>
         </div>
         
-        <div class="content">
-            <div class="welcome-section">
-                <h2>Hello, {user.name}!</h2>
-                <p>Here's your personal wellbeing dashboard</p>
+        <div class="main-card">
+            <div class="progress-summary">
+                <h2 class="progress-title">Week 1 Progress Summary</h2>
+                <p class="progress-subtitle">Based on {len(responses)} days of survey responses</p>
             </div>
             
             {f'''
-            <div class="overall-score">
-                <h3>Overall Wellbeing Score</h3>
-                <div class="score-circle">
-                    <div class="score-value">{overall_score:.1f}</div>
-                </div>
-                <div class="score-label">Out of 10</div>
-            </div>
-            
             <div class="metrics-grid">
-                <div class="metric-card">
-                    <div class="metric-icon joy">❤️</div>
-                    <div class="metric-value">{avg_joy:.1f}</div>
-                    <div class="metric-label">Average Joy</div>
+                <div class="metric-card joy">
+                    <div class="metric-name joy">Joy</div>
+                    <div class="score-display">
+                        <div class="score-value joy">{int(avg_joy * 7)}</div>
+                        <div class="score-max">/70</div>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: {(avg_joy * 7 / 70) * 100}%"></div>
+                            <div class="threshold-line" style="left: {(45 / 70) * 100}%"></div>
+                            <div class="threshold-label" style="left: {(45 / 70) * 100}%">Threshold: 45</div>
+                        </div>
+                    </div>
+                    <div class="status-message {'above' if avg_joy * 7 >= 45 else 'below'}">
+                        {'<svg class="checkmark" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>' if avg_joy * 7 >= 45 else ''}
+                        {'Above recommended threshold' if avg_joy * 7 >= 45 else f'{int(45 - avg_joy * 7)} points to reach threshold'}
+                    </div>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-icon achievement">🎯</div>
-                    <div class="metric-value">{avg_achievement:.1f}</div>
-                    <div class="metric-label">Average Achievement</div>
+                
+                <div class="metric-card achievement">
+                    <div class="metric-name achievement">Achievement</div>
+                    <div class="score-display">
+                        <div class="score-value achievement">{int(avg_achievement * 7)}</div>
+                        <div class="score-max">/70</div>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: {(avg_achievement * 7 / 70) * 100}%"></div>
+                            <div class="threshold-line" style="left: {(42 / 70) * 100}%"></div>
+                            <div class="threshold-label" style="left: {(42 / 70) * 100}%">Threshold: 42</div>
+                        </div>
+                    </div>
+                    <div class="status-message {'above' if avg_achievement * 7 >= 42 else 'below'}">
+                        {'<svg class="checkmark" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>' if avg_achievement * 7 >= 42 else ''}
+                        {'Above recommended threshold' if avg_achievement * 7 >= 42 else f'{int(42 - avg_achievement * 7)} points to reach threshold'}
+                    </div>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-icon meaningfulness">⭐</div>
-                    <div class="metric-value">{avg_meaningfulness:.1f}</div>
-                    <div class="metric-label">Average Meaningfulness</div>
+                
+                <div class="metric-card meaningfulness">
+                    <div class="metric-name meaningfulness">Meaningfulness</div>
+                    <div class="score-display">
+                        <div class="score-value meaningfulness">{int(avg_meaningfulness * 7)}</div>
+                        <div class="score-max">/70</div>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: {(avg_meaningfulness * 7 / 70) * 100}%"></div>
+                            <div class="threshold-line" style="left: {(49 / 70) * 100}%"></div>
+                            <div class="threshold-label" style="left: {(49 / 70) * 100}%">Threshold: 49</div>
+                        </div>
+                    </div>
+                    <div class="status-message {'above' if avg_meaningfulness * 7 >= 49 else 'below'}">
+                        {'<svg class="checkmark" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>' if avg_meaningfulness * 7 >= 49 else ''}
+                        {'Above recommended threshold' if avg_meaningfulness * 7 >= 49 else f'{int(49 - avg_meaningfulness * 7)} points to reach threshold'}
+                    </div>
                 </div>
             </div>
             ''' if responses else '''
@@ -3815,13 +4345,6 @@ def personal_analytics(user_id):
                 </div>
             </div>
             ''' if recent_responses_html else ''}
-            
-            <div class="insights-section">
-                <h3>Keep Going!</h3>
-                <p>Your consistent participation in these surveys helps you track your wellbeing journey. 
-                Continue responding to see how your scores evolve over time and gain valuable insights 
-                into what brings you joy, achievement, and meaning.</p>
-            </div>
         </div>
     </div>
 </body>
@@ -3840,9 +4363,7 @@ def personal_analytics(user_id):
         </html>
         """, 500
 
-# ============================================================================
 # INITIALIZATION
-# ============================================================================
 
 def create_sample_data():
     """Create sample data if it doesn't exist"""

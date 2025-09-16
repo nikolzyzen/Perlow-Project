@@ -1,20 +1,57 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Target, Plus, Search, Calendar, Users, BarChart3, MoreVertical, Play, Pause } from 'lucide-react';
 
+interface Campaign {
+  id: number;
+  name: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  participants: number;
+  responses: number;
+  responseRate: number;
+  description: string;
+}
+
 const CampaignManagement: React.FC = () => {
-  const campaigns = [
-    {
-      id: 1,
-      name: 'Workplace Wellbeing Study',
-      startDate: '2024-01-01',
-      endDate: '2024-03-31',
-      status: 'Active',
-      participants: 89,
-      responses: 1247,
-      responseRate: 78.5,
-      description: 'Understanding workplace satisfaction and mental health patterns'
-    },
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCampaigns = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/campaigns');
+        if (response.ok) {
+          const data = await response.json();
+          // Map API response to component interface
+          const mappedData = data.map((campaign: any) => ({
+            id: campaign.id,
+            name: campaign.name,
+            description: campaign.description,
+            startDate: campaign.startDate,
+            endDate: campaign.endDate,
+            status: campaign.isActive ? 'Active' : 'Inactive',
+            participants: 0, // Will be calculated later when we have user-campaign relationships
+            responses: campaign.responseCount,
+            responseRate: 0 // Will be calculated later
+          }));
+          setCampaigns(mappedData);
+        } else {
+          // Fallback to sample data if API fails
+          setCampaigns([
+            {
+              id: 1,
+              name: 'Workplace Wellbeing Study',
+              startDate: '2024-01-01',
+              endDate: '2024-03-31',
+              status: 'Active',
+              participants: 89,
+              responses: 1247,
+              responseRate: 78.5,
+              description: 'Understanding workplace satisfaction and mental health patterns'
+            },
     {
       id: 2,
       name: 'Student Mental Health Survey',
@@ -36,19 +73,43 @@ const CampaignManagement: React.FC = () => {
       responses: 980,
       responseRate: 85.1,
       description: 'Analyzing the effects of remote work on employee wellbeing'
-    },
-    {
-      id: 4,
-      name: 'Healthcare Workers Support',
-      startDate: '2024-02-01',
-      endDate: '2024-05-31',
-      status: 'Scheduled',
-      participants: 0,
-      responses: 0,
-      responseRate: 0,
-      description: 'Supporting healthcare professionals through challenging times'
-    }
-  ];
+            },
+            {
+              id: 4,
+              name: 'Healthcare Workers Support',
+              startDate: '2024-02-01',
+              endDate: '2024-05-31',
+              status: 'Scheduled',
+              participants: 0,
+              responses: 0,
+              responseRate: 0,
+              description: 'Supporting healthcare professionals through challenging times'
+            }
+          ]);
+        }
+      } catch (error) {
+        console.error('Error fetching campaigns:', error);
+        // Keep fallback data on error
+        setCampaigns([
+          {
+            id: 1,
+            name: 'Workplace Wellbeing Study',
+            startDate: '2024-01-01',
+            endDate: '2024-03-31',
+            status: 'Active',
+            participants: 89,
+            responses: 1247,
+            responseRate: 78.5,
+            description: 'Understanding workplace satisfaction and mental health patterns'
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCampaigns();
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -64,6 +125,17 @@ const CampaignManagement: React.FC = () => {
         return 'bg-gray-100 text-gray-800';
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading campaigns...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-purple-50">

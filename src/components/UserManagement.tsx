@@ -1,9 +1,32 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Users, Plus, Search, Phone, Calendar, MoreVertical } from 'lucide-react';
 
+interface User {
+  id: number;
+  name: string;
+  phone: string;
+  status: string;
+  joinDate: string;
+  responses: number;
+  lastResponse: string;
+}
+
 const UserManagement: React.FC = () => {
-  const users = [
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/users');
+        if (response.ok) {
+          const data = await response.json();
+          setUsers(data);
+        } else {
+          // Fallback to sample data if API fails
+          setUsers([
     {
       id: 1,
       name: 'Sarah Johnson',
@@ -39,8 +62,40 @@ const UserManagement: React.FC = () => {
       joinDate: '2024-01-08',
       responses: 31,
       lastResponse: '30 minutes ago'
-    }
-  ];
+          ]);
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        // Keep fallback data on error
+        setUsers([
+          {
+            id: 1,
+            name: 'Sarah Johnson',
+            phone: '+1 (555) 123-4567',
+            status: 'Active',
+            joinDate: '2024-01-15',
+            responses: 28,
+            lastResponse: '2 hours ago'
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading users...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">

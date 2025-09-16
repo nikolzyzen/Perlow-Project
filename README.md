@@ -1,172 +1,188 @@
-# SMS Survey System
+# SMS Survey System Prototype
 
-A modern SMS-based wellbeing survey system with beautiful React frontend and Flask backend.
+## **Setup**
 
-## 🚀 Quick Start
-
-### One-Command Setup & Start
-```bash
-python quick_start.py
-```
-
-That's it! The system will:
-- ✅ Create virtual environment
-- ✅ Install all dependencies  
-- ✅ Start the server
-- ✅ Open admin dashboard at http://localhost:5001/admin
-
-### Manual Setup (Alternative)
-```bash
-# 1. Setup
-python setup.py
-
-# 2. Start
+To run the program, simply enter:
+```bash 
 python start.py
 ```
+This will automatically:
+- Create a virtual environment 
+- Install all required dependencies
+- Resolve any port conflicts
+- Start the application at http://localhost:5001
 
-### Access Your System
-- **Admin Dashboard**: http://localhost:5001/admin
-- **API Stats**: http://localhost:5001/api/stats
-- **User Analytics**: http://localhost:5001/feedback/4/1
+**Access points:**
 
-## 📁 Simplified File Structure
+- Admin Dashboard: http://localhost:5001/admin/ - Main admin interface with statistics and quick actions
+- User Management: http://localhost:5001/admin/users - View and manage all users
+- Campaign Management: http://localhost:5001/admin/campaigns - View and manage all campaigns
+- Responses View: http://localhost:5001/admin/responses - View all survey responses
+- Personal Analytics: http://localhost:5001/analytics/1 - Individual user's wellbeing insights
+- User Feedback: http://localhost:5001/feedback/1/1 - Page sent to users via SMS after responding
+
+- API Stats: http://localhost:5001/api/stats - System statistics in JSON format
+- API Users: http://localhost:5001/api/users - All users data in JSON format
+- API Campaigns: http://localhost:5001/api/campaigns - All campaigns data in JSON format
+- API Responses: http://localhost:5001/api/responses - Recent responses in JSON format
+- API Analytics: http://localhost:5001/api/analytics/1/1 - Specific user analytics in JSON format
+
+## **System Overview**
+
+This application measures three dimensions of well-being (joy, achievement, and meaningfulness) through daily SMS surveys powered by Twilio. Responses are processed instantly and displayed on a modern admin dashboard, giving users personal insights and progress tracking. The system includes smart scheduling with APScheduler to automate survey delivery and a mock mode that allows cost-free testing without sending real SMS.
+
+
+## **Architecture Overview**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    SMS Survey System                            │
+├─────────────────────────────────────────────────────────────────┤
+│     SMS Layer               Web Layer           Analytics      │
+│  ┌─────────────┐      ┌─────────────────┐    ┌─────────────┐    │
+│  │   Twilio    │◄────►│  React Frontend │◄──►│  Personal   │    │
+│  │   SMS API   │      │  (TypeScript)   │    │ Dashboard   │    │
+│  └─────────────┘      └─────────────────┘    └─────────────┘    │
+│         │                      │                     │          │
+│         ▼                      ▼                     ▼          │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │                Flask Backend (Python)                      │ │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │ │
+│  │  │SMS Service  │ │ API Routes  │ │  Admin Interface    │   │ │
+│  │  │(Mock/Real)  │ │(REST API)   │ │ (Server-rendered)   │   │ │
+│  │  └─────────────┘ └─────────────┘ └─────────────────────┘   │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│                              │                                   │
+│                              ▼                                   │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │              SQLite Database (survey.db)                   │ │
+│  │ ┌─────────┐ ┌─────────────┐ ┌──────────┐ ┌─────────────┐   │ │
+│  │ │  Users  │ │ Campaigns   │ │Response  │ │   Survey    │   │ │
+│  │ │ Table   │ │   Table     │ │ Table    │ │  Messages   │   │ │
+│  │ └─────────┘ └─────────────┘ └──────────┘ └─────────────┘   │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## **Project Structure**
 
 ```
 sms_survey_system/
-├── sms_survey.py          # Main application (everything in one file)
-├── requirements.txt       # Python dependencies
-├── README.md             # Complete documentation
-├── quick_start.py        # One-command setup & start
-├── setup.py              # Manual setup script
-├── start.py              # Manual start script
-├── src/                  # React frontend (optional)
-└── venv/                 # Virtual environment
+├── sms_survey.py              # Main Flask application
+├── start.py                   # Setup + start
+├── requirements.txt           # Python dependencies
+├── README.md                  # This documentation
+│
+├── instance/                  # Flask instance folder
+│   └── survey.db                 # SQLite database
+│
+├── venv/                      # Python virtual environment 
+│   ├── bin/                      # Python executables
+│   ├── lib/                      # Installed packages
+│   └── pyvenv.cfg               # Environment configuration
+│
+└── src/                       # React frontend source code
+    ├── App.tsx                   # Main React app component
+    ├── main.tsx                  # React entry point
+    ├── index.css                 # Global styles
+    └── components/               # React components
+        ├── AdminDashboard.tsx    # Main admin interface
+        ├── PersonalAnalytics.tsx # User analytics dashboard
+        ├── UserManagement.tsx    # User CRUD operations
+        ├── CampaignManagement.tsx# Campaign CRUD operations
+        ├── ResponsesView.tsx     # Survey responses display
+        ├── StatsCard.tsx         # Reusable statistics widget
+        ├── QuickActionCard.tsx   # Action button component
+        └── RecentActivity.tsx    # Activity feed component
 ```
 
-## 📱 Features
+## **Database Schema**
 
-### Core Functionality
-- **SMS Surveys**: Send wellbeing surveys via SMS
-- **Mock SMS Mode**: Test without real SMS costs
-- **User Management**: Add/edit users and campaigns
-- **Analytics**: Beautiful personal analytics for users
-- **Admin Dashboard**: Modern Pinterest-like UI
+### **Entity Relationships**
+```
+Users ↔ Campaigns (Many-to-Many via Responses)
+  │         │
+  ▼         ▼
+Responses (Junction Table + Data)
+  │
+  ▼
+Survey Messages (Delivery Tracking)
+```
 
-### Modern UI
-- **React Frontend**: Beautiful, responsive interface
-- **Real-time Data**: Live API integration
-- **Mobile Optimized**: Works on all devices
-- **Smooth Animations**: Professional user experience
+## **API Endpoints**
 
-## Development
+### **Statistics & Analytics**
+| Endpoint | Method | Purpose | Response |
+|----------|--------|---------|----------|
+| `/api/stats` | GET | Dashboard overview | User/campaign/response counts |
+| `/api/analytics/<user_id>/<campaign_id>` | GET | Personal analytics | Individual insights & trends |
 
-### Frontend Development (Optional)
+### **Data Management**  
+| Endpoint | Method | Purpose | Response |
+|----------|--------|---------|----------|
+| `/api/users` | GET | List all users | Users with response counts |
+| `/api/campaigns` | GET | List campaigns | Campaigns with statistics |
+| `/api/responses` | GET | List responses | All survey submissions |
+
+### **Administrative Actions**
+| Endpoint | Method | Purpose | Body |
+|----------|--------|---------|------|
+| `/admin/add-user` | POST | Create user | `{name, phone_number}` |
+| `/admin/add-campaign` | POST | Create campaign | `{name, description, dates}` |
+| `/admin/test-sms` | POST | Send test SMS | `{phone_number, message}` |
+
+### **SMS Integration**
+| Endpoint | Method | Purpose | Notes |
+|----------|--------|---------|-------|
+| `/webhook/sms` | POST | Twilio webhook | Parses "8/7/9/text" format |
+| `/feedback/<user_id>/<campaign_id>` | GET | Personal analytics page | User-facing HTML |
+
+
+### **Sample Survey Message**
+```
+Hi Sarah! 
+
+Daily Wellbeing Check-in for September 15, 2024:
+
+Please rate your day yesterday (1-10):
+1. Joy: How much joy did you get?
+2. Achievement: How much achievement did you get?
+3. Meaningfulness: How much meaningfulness did you get?
+4. Influence: What influenced your ratings most?
+
+Reply with: joy/achievement/meaningfulness/influence
+Example: 8/7/9/Spent time with family
+
+Thank you for participating! 💙
+```
+
+## **Technology Stack Choice**
+
+Given the short development timeline, I built a rough prototype meant as a starting point rather than something ready for deployment. I also want to acknowledge the use of the Claude-4-Sonnet model, which helped me write and debug parts of the code.
+
+For the backend, I chose Python with Flask because it’s lightweight and well-suited for building APIs, while still leaving room to integrate analytics or data science later. SQLite with SQLAlchemy provides an easy, no-setup database during development, while keeping the flexibility to migrate to a more robust system if needed.
+
+For communication, the Twilio SMS API handles sending and receiving texts, offloading infrastructure complexity. Paired with APScheduler, it enables automated daily surveys and background tasks without extra services.
+
+On the front end, I used React with TypeScript for productivity and maintainability, Vite for fast builds and a smooth dev experience, and Tailwind CSS for efficient, responsive styling without the overhead of a custom design system.
+
+That said, the current system isn’t production-ready. The backend would likely need to be rewritten in C# with PostgreSQL, since that combination is better suited for caching, optimization, and handling higher traffic. It would also require a more detailed database schema, well-structured business logic, and properly defined endpoints—areas that would demand significantly more design and planning time.
+
+I also encountered limitations with Twilio. Sending real messages requires a verified business account and incurs per-message costs, which I couldn’t set up without assistance. To work around this, I implemented a Mock SMS mode that simulates sending and receiving texts by logging them to the console. This allows end-to-end testing of survey delivery, response handling, and webhooks without relying on paid SMS.
+
+In production, the mock mode would need to be disabled with proper configuration:
 ```bash
-# Install Node.js first, then:
-cd frontend
-npm install
-npm run dev
+TWILIO_ACCOUNT_SID=your_account_sid
+TWILIO_AUTH_TOKEN=your_auth_token
+TWILIO_PHONE_NUMBER=your_twilio_phone
+USE_MOCK_SMS=false
+FLASK_ENV=production
+SECRET_KEY=your-secure-secret-key
+PORT=5001
+DATABASE_URL=sqlite:///survey.db
+BASE_URL=https://yourdomain.com
 ```
 
-### API Endpoints
-- `GET /api/stats` - Dashboard statistics
-- `GET /api/users` - All users
-- `GET /api/campaigns` - All campaigns
-- `GET /api/responses` - Recent responses
-- `GET /api/analytics/<user_id>/<campaign_id>` - User analytics
+Finally, the frontend pulls live data through API endpoints for admin pages, user analytics, and campaign views. However, some data is still intentionally hardcoded—sample responses, fallback content, and placeholders—to keep the interface consistent, support testing, and ensure it never appears empty.
 
-## Troubleshooting
 
-### Virtual Environment Issues
-**Always use virtual environment:**
-```bash
-
-source venv/bin/activate
-python sms_survey.py
-
-```
-
-### Twilio Configuration
-The system uses **Mock SMS** by default. To use real Twilio:
-1. Set `USE_MOCK_SMS=false` in `.env`
-2. Add your Twilio credentials:
-   ```
-   TWILIO_ACCOUNT_SID=your_account_sid
-   TWILIO_AUTH_TOKEN=your_auth_token
-   TWILIO_PHONE_NUMBER=your_phone_number
-   ```
-
-### Common Issues
-- **Jinja2 Error**: Use virtual environment
-- **Port 5001 in use**: Change PORT in `.env`
-- **Database errors**: Delete `instance/survey.db` to reset
-
-## 📊 Usage
-
-### Admin Dashboard
-1. Go to http://localhost:5001/admin
-2. Add users and campaigns
-3. Send test SMS surveys
-4. View responses and analytics
-
-### User Experience
-1. Users receive SMS surveys
-2. They respond with ratings (e.g., "8/7/9/Spent time with family")
-3. System automatically sends analytics link
-4. Users view their personalized insights
-
-### SMS Format
-Users respond with: `joy/achievement/meaningfulness/influence_text`
-Example: `8/7/9/Spent time with family`
-
-## 🎯 Project Structure
-
-```
-sms_survey_system/
-├── sms_survey.py          # Main application (everything in one file)
-├── requirements.txt       # Python dependencies
-├── .env                   # Environment configuration
-├── README.md             # This file
-├── frontend/             # React frontend (optional)
-└── instance/             # Database files
-```
-
-## 🚀 Production
-
-### Simple Deployment
-```bash
-# Build frontend (if using React)
-cd frontend && npm run build:prod
-
-# Run production server
-source venv/bin/activate
-python sms_survey.py
-```
-
-### Environment Variables
-Set these in production:
-- `FLASK_ENV=production`
-- `SECRET_KEY=your_secure_secret_key`
-- `DATABASE_URL=your_production_database_url`
-
-## 📈 Analytics
-
-The system tracks:
-- **Joy**: How happy users feel
-- **Achievement**: How accomplished they feel
-- **Meaningfulness**: How purposeful their activities are
-- **Influence**: What affected their day
-
-Users get personalized insights and can track their wellbeing over time.
-
-## 🎉 Success!
-
-When everything works, you'll see:
-```
-🚀 Starting SMS Survey System...
-✅ Virtual environment activated
-🌐 Starting Flask server on http://localhost:5001
-📱 Access your admin dashboard at: http://localhost:5001/admin
-```
-
-Happy surveying! 📊✨
